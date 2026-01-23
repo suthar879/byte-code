@@ -2,6 +2,16 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import { error } from "console";
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const createArticleSchema = z.object({
   title: z.string().min(3).max(100),
@@ -20,6 +30,7 @@ type CreateArticlesFormstate = {
 };
 
 export const createArticle = async (
+  prevState: CreateArticlesFormstate,
   formData: FormData,
 ): Promise<CreateArticlesFormstate> => {
   const result = createArticleSchema.safeParse({
@@ -38,5 +49,87 @@ export const createArticle = async (
       errors: { formsErrors: ["you have to login first"] },
     };
   }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { clerkUserId: userId },
+  });
+
+  if (!existingUser) {
+    return {
+      errors: {
+        formsErrors: [
+          "User not found. Please register before creating an articles",
+        ],
+      },
+    };
+  }
+
+  const imageFile = formData.get("featuredImage") as File | null;
+  if (!imageFile || imageFile.name === "undefined") {
+    return {
+      errors: {
+        featuredImage: ["Image file is required"],
+      },
+    };
+  }
+
+  const arrayBuffer = await imageFile.arrayBuffer();
+
+  const buffer = Buffer.from(arrayBuffer);
+
+  const uploadResponse: UploadApiResponse | undefined = await new Promise(
+    (resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto",
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        },
+      );
+      uploadStream.end(buffer);
+    },
+  );
+
+  const imageUrl = uploadResponse?.secure_url;
+
+  if (!imageUrl) {
+    return {
+      errors: {
+        featuredImage: ["Failed to upload image. Please try again"],
+      },
+    };
+  }
+
+  try {
+    await prisma.articles.create({
+      data: {
+        title: result.data.title,
+        category: result.data.category,
+        content: result.data.content,
+        featuredImage: imageUrl,
+        authorId: existingUser.id,
+      },
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        errors: {
+          formsErrors: [error.message],
+        },
+      };
+    } else {
+      return {
+        errors: {
+          formsErrors: ["Some internal error occurred"],
+        },
+      };
+    }
+  }
+  revalidatePath("/dashboard");
   redirect("/dashboard");
 };
