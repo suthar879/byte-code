@@ -27,29 +27,28 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await currentUser();
-  if (!user) return null;
 
-  const loggedInUser = await prisma.user.findUnique({
-    where: { clerkUserId: user.id },
-  });
-
-  if (!loggedInUser) {
-    await prisma.user.create({
-      data: {
-        name: user.fullName as string,
-        clerkUserId: user.id,
-        email: user.emailAddresses[0].emailAddress,
-        imageUrl: user.imageUrl,
-      },
+  if (user) {
+    const loggedInUser = await prisma.user.findUnique({
+      where: { clerkUserId: user.id },
     });
+
+    if (!loggedInUser) {
+      await prisma.user.create({
+        data: {
+          name: user.fullName as string,
+          clerkUserId: user.id,
+          email: user.emailAddresses[0].emailAddress,
+          imageUrl: user.imageUrl,
+        },
+      });
+    }
   }
 
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ClerkProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -58,8 +57,8 @@ export default async function RootLayout({
           >
             {children}
           </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

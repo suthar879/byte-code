@@ -1,11 +1,31 @@
 import Link from "next/link";
 import React from "react";
 import { Button } from "../ui/button";
-import { FileText, MessageCircle, PlusCircle } from "lucide-react";
+import { Clock, FileText, MessageCircle, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import RecentArticles from "./recent-articles";
+import { prisma } from "@/lib/prisma";
 
-const BlogDashboard = () => {
+const BlogDashboard = async () => {
+  const [articles, totalComments] = await Promise.all([
+    prisma.articles.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        comments: true,
+        author: {
+          select: {
+            name: true,
+            email: true,
+            imageUrl: true,
+          },
+        },
+      },
+    }),
+    prisma.comment.count(),
+  ]);
+
   return (
     <main className="flex-1 p4 md:p-8">
       <div className="flex justify-between items-center mb-8">
@@ -30,7 +50,7 @@ const BlogDashboard = () => {
             <FileText className="h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2</div>
+            <div className="text-2xl font-bold">{articles.length}</div>
             <p className="text-sm text-muted-foreground mt-1">
               +5 from last month
             </p>
@@ -45,7 +65,7 @@ const BlogDashboard = () => {
             <MessageCircle className="h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{totalComments}</div>
             <p className="text-sm text-muted-foreground mt-1">
               12 awaiting moderation
             </p>
@@ -56,7 +76,7 @@ const BlogDashboard = () => {
             <CardTitle className="font-medium text-sm">
               Avg Rating Time
             </CardTitle>
-            <FileText className="h-4 w-4" />
+            <Clock className="h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">4.2</div>
@@ -66,7 +86,7 @@ const BlogDashboard = () => {
           </CardContent>
         </Card>
       </div>
-      <RecentArticles />
+      <RecentArticles articles={articles} />
     </main>
   );
 };

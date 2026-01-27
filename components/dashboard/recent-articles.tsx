@@ -11,8 +11,24 @@ import {
 } from "../ui/table";
 import { Badge } from "../ui/badge";
 import Link from "next/link";
+import { Prisma } from "@/generated/prisma/client";
 
-const RecentArticles = () => {
+type RecentArticlesProps = {
+  articles: Prisma.ArticlesGetPayload<{
+    include: {
+      comments: true;
+      author: {
+        select: {
+          name: true;
+          email: true;
+          imageUrl: true;
+        };
+      };
+    };
+  }>[];
+};
+
+const RecentArticles: React.FC<RecentArticlesProps> = ({ articles }) => {
   return (
     <Card>
       <CardHeader>
@@ -27,44 +43,50 @@ const RecentArticles = () => {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Comments</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>title</TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className="rounded-full bg-green-100 text-green-800"
-                >
-                  Published
-                </Badge>
-              </TableCell>
-              <TableCell>2</TableCell>
-              <TableCell>12 Feb</TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <Link href={`/dashboard/articles/${123}/edit`}>
-                    <Button variant={"ghost"} size="sm">
-                      Edit
-                    </Button>
-                  </Link>
-                  <DeleteButton />
-                </div>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </CardContent>
+      {!articles.length ? (
+        <CardContent>No article found</CardContent>
+      ) : (
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Comments</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {articles.map((article) => (
+                <TableRow key={article.id}>
+                  <TableCell>{article.title}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full bg-green-100 text-green-800"
+                    >
+                      Published
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{article.comments.length}</TableCell>
+                  <TableCell>{article.createdAt.toISOString()}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Link href={`/dashboard/articles/${article.id}/edit`}>
+                        <Button variant={"ghost"} size="sm">
+                          Edit
+                        </Button>
+                      </Link>
+                      <DeleteButton />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
     </Card>
   );
 };
